@@ -5,6 +5,7 @@ const urls = {
   login: `${API_Base_url}/login`,
   create_admin: `${API_Base_url}/create_admin`,
   create_sub_admin: `${API_Base_url}/create_sub_admin`,
+  customer_register: `${API_Base_url}/customer_register/`,
 };
 
 export default urls;

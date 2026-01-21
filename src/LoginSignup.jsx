@@ -11,6 +11,9 @@ import {
     Person as PersonIcon,
     Email as EmailIcon,
     Lock as LockIcon,
+    Phone as PhoneIcon,
+    LocationOn as LocationIcon,
+    Badge as BadgeIcon,
     CheckCircle as CheckCircleIcon,
     Visibility as VisibilityIcon,
     VisibilityOff as VisibilityOffIcon
@@ -29,25 +32,32 @@ const LoginSignup = () => {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState({});
     const [formData, setFormData] = useState({
         username: "",
         password: "",
         confirmPassword: "",
+        rememberMe: false,
         email: "",
         first_name: "",
         last_name: "",
         phone_number: "",
         address: "",
         image: "",
-        rememberMe: false,
+        client_code: "",
     });
 
     // State to track focused fields
     const [focusedFields, setFocusedFields] = useState({
-        name: false,
+        username: false,
         email: false,
         password: false,
         confirmPassword: false,
+        first_name: false,
+        last_name: false,
+        phone_number: false,
+        address: false,
+        client_code: false,
     });
 
     // Check if mobile
@@ -67,6 +77,9 @@ const LoginSignup = () => {
             ...formData,
             [name]: type === 'checkbox' ? checked : value
         });
+        if (fieldErrors[name]) {
+            setFieldErrors(prev => ({ ...prev, [name]: "" }));
+        }
     };
 
     const handleFocus = (fieldName) => {
@@ -77,7 +90,6 @@ const LoginSignup = () => {
     };
 
     const handleBlur = (fieldName) => {
-        // Check if the field has value, if not, remove focus
         const fieldValue = formData[fieldName];
         if (!fieldValue) {
             setFocusedFields(prev => ({
@@ -99,44 +111,58 @@ const LoginSignup = () => {
     }, []);
 
     const validateForm = () => {
-        if (!isLogin && !formData.name.trim()) {
-            toast.error('Name is required');
-            return false;
+        if (!isLogin) {
+            // Registration validation
+            if (!formData.username.trim()) {
+                toast.error('Username is required');
+                return false;
+            }
+            if (!formData.email.trim()) {
+                toast.error('Email is required');
+                return false;
+            }
+            if (!formData.first_name.trim()) {
+                toast.error('First name is required');
+                return false;
+            }
+            if (!formData.last_name.trim()) {
+                toast.error('Last name is required');
+                return false;
+            }
+            if (!formData.phone_number.trim()) {
+                toast.error('Phone number is required');
+                return false;
+            }
+            if (!formData.password) {
+                toast.error('Password is required');
+                return false;
+            }
+            if (formData.password !== formData.confirmPassword) {
+                toast.error('Passwords do not match');
+                return false;
+            }
+            if (!formData.client_code) {
+                toast.error('Client code is required');
+                return false;
+            }
+        } else {
+            // Login validation
+            if (!formData.username.trim()) {
+                toast.error('Username is required');
+                return false;
+            }
+            if (!formData.password) {
+                toast.error('Password is required');
+                return false;
+            }
         }
-
-        if (!formData.username.trim()) {
-            toast.error('username is required');
-            return false;
-        }
-
-        else if (!formData.username) {
-            toast.error('Please enter a valid username address');
-            return false;
-        }
-
-        if (!formData.password) {
-            toast.error('Password is required');
-            return false;
-        }
-
-        if (!isLogin && formData.password !== formData.confirmPassword) {
-            toast.error('Passwords do not match');
-            return false;
-        }
-
         return true;
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        if (!validateForm()) return;
-
+    const handleLogin = async () => {
         setLoading(true);
-
         try {
             console.log("🔐 LOGIN API CALLED");
-
             const response = await axios.post(
                 urls.login,
                 {
@@ -150,60 +176,25 @@ const LoginSignup = () => {
             );
 
             console.log("✅ LOGIN SUCCESS");
-            console.log("📦 Full Response:", response.data);
-
             const { access, refresh, user } = response.data;
 
-            // ✅ Save tokens
             if (access) {
                 localStorage.setItem("access_token", access);
-                console.log("🔑 Access token saved");
             }
-
             if (refresh) {
                 localStorage.setItem("refresh_token", refresh);
-                console.log("🔁 Refresh token saved");
             }
-
             if (user) {
-                const userData = {
-                    ...user,
-                    role: user.role || null,
-                };
-                localStorage.setItem("user", JSON.stringify(userData));
-                console.log("👤 User saved:", userData);
-
+                localStorage.setItem("user", JSON.stringify(user));
                 const userRole = user.role;
 
-                console.log("🎯 User role:", userRole);
-
-                if (userRole === 'admin') {
-                    toast.success("Welcome Admin! Redirecting to Admin Dashboard...");
-                    setTimeout(() => {
-                        navigate("/adminDashboard");
-                    }, 1500);
-                } else {
-                    toast.success("Welcome Super Admin! Redirecting to Super Admin Dashboard...");
-                    setTimeout(() => {
-                        navigate("/superAdminDashboard");
-                    }, 1500);
+                if (userRole === 'customer') {
+                    toast.success("Welcome Admin! Redirecting...");
+                    setTimeout(() => navigate("/customerDashboard"), 1500);
                 }
-            } else {
-                toast.success("Login successful! Redirecting...");
-                setTimeout(() => {
-                    navigate("/superAdminDashboard");
-                }, 1500);
             }
-
         } catch (error) {
             console.error("❌ LOGIN ERROR");
-
-            console.error({
-                status: error.response?.status,
-                data: error.response?.data,
-                message: error.message,
-            });
-
             toast.error(
                 error.response?.data?.detail ||
                 error.response?.data?.message ||
@@ -214,12 +205,93 @@ const LoginSignup = () => {
         }
     };
 
+    const handleRegister = async () => {
+        setLoading(true);
+        try {
+            console.log("📝 REGISTRATION API CALLED");
+
+            const registrationData = {
+                username: formData.username,
+                password: formData.password,
+                email: formData.email,
+                first_name: formData.first_name,
+                last_name: formData.last_name,
+                phone_number: formData.phone_number,
+                address: formData.address,
+                image: formData.image || "profile.png",
+                client_code: formData.client_code
+            };
+
+            console.log("Registration Data:", registrationData);
+            const response = await axios.post(
+                urls.customer_register,
+                registrationData,
+                {
+                    headers: { "Content-Type": "application/json" },
+                    timeout: 15000,
+                }
+            );
+
+            console.log("✅ REGISTRATION SUCCESS");
+            console.log("📦 Response:", response.data);
+
+            toast.success("Registration successful! Please login.");
+
+            // Clear form and switch to login mode
+            setFormData({
+                username: "",
+                password: "",
+                confirmPassword: "",
+                rememberMe: false,
+                email: "",
+                first_name: "",
+                last_name: "",
+                phone_number: "",
+                address: "",
+                image: "",
+                client_code: "",
+            });
+
+            setIsLogin(true);
+
+        } catch (error) {
+            console.error("❌ REGISTRATION ERROR", error.response?.data);
+
+            const data = error.response?.data;
+
+            if (data && typeof data === "object") {
+                setFieldErrors(data);
+
+                // Optional: toast first error only
+                const firstError = Object.values(data)[0];
+                if (Array.isArray(firstError)) {
+                    toast.error(firstError[0]);
+                }
+            } else {
+                toast.error("Registration failed");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!validateForm()) return;
+
+        if (isLogin) {
+            await handleLogin();
+        } else {
+            await handleRegister();
+        }
+    };
+
     const toggleMode = () => {
         setIsLogin(!isLogin);
     };
 
     const handleForgotPassword = () => {
-        toast.info('Password reset link would be sent to your username');
+        toast.info('Password reset link would be sent to your email');
     };
 
     // Custom style function for text fields
@@ -237,7 +309,7 @@ const LoginSignup = () => {
             },
             background: 'transparent',
             '& .MuiInputAdornment-positionStart': {
-                marginRight: '12px', // Add space between icon and input text
+                marginRight: '12px',
             }
         },
         '& .MuiInputLabel-root': {
@@ -245,24 +317,22 @@ const LoginSignup = () => {
             '&.Mui-focused': {
                 color: '#f0f0f0',
             },
-            // Adjust label position to account for icon padding
-            transform: `translate(${hasIcon ? '58px' : '14px'}, 16px) scale(1)`,
+            transform: `translate(${hasIcon ? '48px' : '14px'}, 16px) scale(1)`,
             '&.MuiInputLabel-shrink': {
-                transform: `translate(${hasIcon ? '58px' : '14px'}, -6px) scale(0.75)`,
+                transform: `translate(${hasIcon ? '18px' : '14px'}, -10px) scale(0.75)`,
             },
         },
         '& .MuiInputBase-input': {
             color: '#f0f0f0',
             padding: isMobile
-                ? (hasIcon ? '14px 12px 14px 52px' : '14px 12px')
-                : (hasIcon ? '16px 12px 16px 52px' : '16px 12px'),
+                ? (hasIcon ? '14px 12px 14px 6px' : '14px 12px')
+                : (hasIcon ? '16px 12px 16px 6px' : '16px 12px'),
             fontSize: isMobile ? '0.95rem' : '1rem',
             '&::placeholder': {
                 color: 'rgba(255, 255, 255, 0.5)',
                 opacity: 1,
             },
         },
-        // Custom styling for password fields
         '& .MuiInputBase-input[type="password"]': {
             letterSpacing: '1px',
         },
@@ -328,7 +398,6 @@ const LoginSignup = () => {
             overflow: 'hidden',
             fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
         }}>
-            {/* Add CSS animations */}
             <style>{floatingAnimation}</style>
 
             {/* Animated Background */}
@@ -361,8 +430,8 @@ const LoginSignup = () => {
             <div style={{
                 display: 'flex',
                 width: '100%',
-                maxWidth: isMobile ? '100%' : '1000px',
-                minHeight: isMobile ? '100vh' : '600px',
+                maxWidth: isMobile ? '100%' : '1200px',
+                minHeight: isMobile ? '100vh' : '700px',
                 background: 'white',
                 borderRadius: isMobile ? 0 : '15px',
                 overflow: 'hidden',
@@ -416,7 +485,7 @@ const LoginSignup = () => {
                     justifyContent: 'center',
                     background: '#007cba',
                     position: 'relative',
-                    overflow: 'hidden',
+                    overflow: isLogin ? 'hidden' : 'auto',
                     borderRadius: isMobile ? '20px 20px 0 0' : '0 15px 15px 0',
                     marginTop: isMobile ? '-30px' : 0,
                     minHeight: isMobile ? '70vh' : 'auto'
@@ -566,63 +635,202 @@ const LoginSignup = () => {
                         </h2>
 
                         <form onSubmit={handleSubmit}>
-                            {/* Name Field - Only for Signup */}
-                            {!isLogin && (
-                                <div style={{ marginBottom: isMobile ? '25px' : '30px' }}>
-                                    <TextField
-                                        fullWidth
-                                        name="name"
-                                        label="Full Name"
-                                        variant="outlined"
-                                        value={formData.name}
-                                        onChange={handleInputChange}
-                                        onFocus={() => handleFocus('name')}
-                                        onBlur={() => handleBlur('name')}
-                                        InputLabelProps={{
-                                            shrink: focusedFields.name || !!formData.name,
-                                        }}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start" sx={{ marginRight: '12px' }}>
-                                                    <PersonIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
-                                                </InputAdornment>
-                                            ),
-                                            placeholder: !focusedFields.name && !formData.name ? 'Full Name' : '',
-                                        }}
-                                        sx={getTextFieldStyles('name', true)}
-                                    />
-                                </div>
-                            )}
-
-                            {/* Email Field */}
-                            <div style={{ marginBottom: isMobile ? '25px' : '30px' }}>
+                            {/* Username Field (for both login and register) */}
+                            <div style={{ marginBottom: isMobile ? '20px' : '25px' }}>
                                 <TextField
                                     fullWidth
-                                    name="email"
-                                    label="Email Address"
-                                    type="email"
+                                    name="username"
+                                    label="Username"
                                     variant="outlined"
-                                    value={formData.email}
+                                    value={formData.username}
                                     onChange={handleInputChange}
-                                    onFocus={() => handleFocus('email')}
-                                    onBlur={() => handleBlur('email')}
+                                    error={!!fieldErrors.username}
+                                    helperText={fieldErrors.username?.[0]}
+                                    onFocus={() => handleFocus('username')}
+                                    onBlur={() => handleBlur('username')}
                                     InputLabelProps={{
-                                        shrink: focusedFields.email || !!formData.email,
+                                        shrink: focusedFields.username || !!formData.username,
                                     }}
                                     InputProps={{
                                         startAdornment: (
-                                            <InputAdornment position="start" sx={{ marginRight: '12px' }}>
-                                                <EmailIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
+                                            <InputAdornment position="start" sx={{ marginRight: '12px' }} >
+                                                <PersonIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
                                             </InputAdornment>
                                         ),
-                                        placeholder: !focusedFields.email && !formData.email ? 'Email Address' : '',
+                                        placeholder: !focusedFields.username && !formData.username ? 'Username' : '',
                                     }}
-                                    sx={getTextFieldStyles('email', true)}
+                                    sx={getTextFieldStyles('username', true)}
                                 />
                             </div>
 
+                            {/* Only show registration fields when not in login mode */}
+                            {!isLogin && (
+                                <>
+                                    {/* Email Field */}
+                                    <div style={{ marginBottom: isMobile ? '20px' : '25px' }}>
+                                        <TextField
+                                            fullWidth
+                                            name="email"
+                                            label="Email"
+                                            type="email"
+                                            variant="outlined"
+                                            value={formData.email}
+                                            onChange={handleInputChange}
+                                            error={!!fieldErrors.email}
+                                            helperText={fieldErrors.email?.[0]}
+                                            onFocus={() => handleFocus('email')}
+                                            onBlur={() => handleBlur('email')}
+                                            InputLabelProps={{
+                                                shrink: focusedFields.email || !!formData.email,
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start" sx={{ marginRight: '12px' }}>
+                                                        <EmailIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
+                                                    </InputAdornment>
+                                                ),
+                                                placeholder: !focusedFields.email && !formData.email ? 'Email Address' : '',
+                                            }}
+                                            sx={getTextFieldStyles('email', true)}
+                                        />
+                                    </div>
+
+                                    {/* First Name Field */}
+                                    <div style={{ marginBottom: isMobile ? '20px' : '25px' }}>
+                                        <TextField
+                                            fullWidth
+                                            name="first_name"
+                                            label="First Name"
+                                            variant="outlined"
+                                            value={formData.first_name}
+                                            onChange={handleInputChange}
+                                            onFocus={() => handleFocus('first_name')}
+                                            onBlur={() => handleBlur('first_name')}
+                                            InputLabelProps={{
+                                                shrink: focusedFields.first_name || !!formData.first_name,
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start" sx={{ marginRight: '12px' }}>
+                                                        <PersonIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
+                                                    </InputAdornment>
+                                                ),
+                                                placeholder: !focusedFields.first_name && !formData.first_name ? 'First Name' : '',
+                                            }}
+                                            sx={getTextFieldStyles('first_name', true)}
+                                        />
+                                    </div>
+
+                                    {/* Last Name Field */}
+                                    <div style={{ marginBottom: isMobile ? '20px' : '25px' }}>
+                                        <TextField
+                                            fullWidth
+                                            name="last_name"
+                                            label="Last Name"
+                                            variant="outlined"
+                                            value={formData.last_name}
+                                            onChange={handleInputChange}
+                                            onFocus={() => handleFocus('last_name')}
+                                            onBlur={() => handleBlur('last_name')}
+                                            InputLabelProps={{
+                                                shrink: focusedFields.last_name || !!formData.last_name,
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start" sx={{ marginRight: '12px' }}>
+                                                        <PersonIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
+                                                    </InputAdornment>
+                                                ),
+                                                placeholder: !focusedFields.last_name && !formData.last_name ? 'Last Name' : '',
+                                            }}
+                                            sx={getTextFieldStyles('last_name', true)}
+                                        />
+                                    </div>
+
+                                    {/* Phone Number Field */}
+                                    <div style={{ marginBottom: isMobile ? '20px' : '25px' }}>
+                                        <TextField
+                                            fullWidth
+                                            name="phone_number"
+                                            label="Phone Number"
+                                            variant="outlined"
+                                            value={formData.phone_number}
+                                            onChange={handleInputChange}
+                                            error={!!fieldErrors.phone_number}
+                                            helperText={fieldErrors.phone_number?.[0]}
+                                            onFocus={() => handleFocus('phone_number')}
+                                            onBlur={() => handleBlur('phone_number')}
+                                            InputLabelProps={{
+                                                shrink: focusedFields.phone_number || !!formData.phone_number,
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start" sx={{ marginRight: '12px' }}>
+                                                        <PhoneIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
+                                                    </InputAdornment>
+                                                ),
+                                                placeholder: !focusedFields.phone_number && !formData.phone_number ? 'Phone Number' : '',
+                                            }}
+                                            sx={getTextFieldStyles('phone_number', true)}
+                                        />
+                                    </div>
+
+                                    {/* Address Field */}
+                                    <div style={{ marginBottom: isMobile ? '20px' : '25px' }}>
+                                        <TextField
+                                            fullWidth
+                                            name="address"
+                                            label="Address"
+                                            variant="outlined"
+                                            value={formData.address}
+                                            onChange={handleInputChange}
+                                            onFocus={() => handleFocus('address')}
+                                            onBlur={() => handleBlur('address')}
+                                            InputLabelProps={{
+                                                shrink: focusedFields.address || !!formData.address,
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start" sx={{ marginRight: '12px' }}>
+                                                        <LocationIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
+                                                    </InputAdornment>
+                                                ),
+                                                placeholder: !focusedFields.address && !formData.address ? 'Address' : '',
+                                            }}
+                                            sx={getTextFieldStyles('address', true)}
+                                        />
+                                    </div>
+
+                                    {/* Client Code Field */}
+                                    <div style={{ marginBottom: isMobile ? '20px' : '25px' }}>
+                                        <TextField
+                                            fullWidth
+                                            name="client_code"
+                                            label="Client Code"
+                                            variant="outlined"
+                                            value={formData.client_code}
+                                            onChange={handleInputChange}
+                                            onFocus={() => handleFocus('client_code')}
+                                            onBlur={() => handleBlur('client_code')}
+                                            InputLabelProps={{
+                                                shrink: focusedFields.client_code || !!formData.client_code,
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start" sx={{ marginRight: '12px' }}>
+                                                        <BadgeIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
+                                                    </InputAdornment>
+                                                ),
+                                                placeholder: !focusedFields.client_code && !formData.client_code ? 'Client Code' : '',
+                                            }}
+                                            sx={getTextFieldStyles('client_code', true)}
+                                        />
+                                    </div>
+                                </>
+                            )}
+
                             {/* Password Field */}
-                            <div style={{ marginBottom: isMobile ? '25px' : '30px' }}>
+                            <div style={{ marginBottom: isMobile ? '20px' : '25px' }}>
                                 <TextField
                                     fullWidth
                                     name="password"
@@ -661,7 +869,7 @@ const LoginSignup = () => {
 
                             {/* Confirm Password Field - Only for Signup */}
                             {!isLogin && (
-                                <div style={{ marginBottom: isMobile ? '25px' : '30px' }}>
+                                <div style={{ marginBottom: isMobile ? '20px' : '25px' }}>
                                     <TextField
                                         fullWidth
                                         name="confirmPassword"
@@ -698,77 +906,38 @@ const LoginSignup = () => {
                                     />
                                 </div>
                             )}
-                            {/* 6 Password Field - Only for Signup */}
-                            {!isLogin && (
-                                <div style={{ marginBottom: isMobile ? '25px' : '30px' }}>
-                                    <TextField
-                                        fullWidth
-                                        name="confirmPassword"
-                                        label="Code"
-                                        type={showConfirmPassword ? "text" : "password"}
-                                        variant="outlined"
-                                        value={formData.confirmPassword}
-                                        onChange={handleInputChange}
-                                        onFocus={() => handleFocus('confirmPassword')}
-                                        onBlur={() => handleBlur('confirmPassword')}
-                                        InputLabelProps={{
-                                            shrink: focusedFields.confirmPassword || !!formData.confirmPassword,
-                                        }}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start" sx={{ marginRight: '12px' }}>
-                                                    <CheckCircleIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
-                                                </InputAdornment>
-                                            ),
-                                            endAdornment: (
-                                                <InputAdornment position="end">
-                                                    <IconButton
-                                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                        edge="end"
-                                                        sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                                                    >
-                                                        {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                                    </IconButton>
-                                                </InputAdornment>
-                                            ),
-                                            placeholder: !focusedFields.confirmPassword && !formData.confirmPassword ? 'Confirm Password' : '',
-                                        }}
-                                        sx={getTextFieldStyles('confirmPassword', true)}
+
+                            {/* Options - Only for login */}
+                            {isLogin && (
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    margin: isMobile ? '20px 0' : '25px 0',
+                                    flexDirection: isMobile ? 'column' : 'row',
+                                    gap: isMobile ? '15px' : '0'
+                                }}>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                name="rememberMe"
+                                                checked={formData.rememberMe}
+                                                onChange={handleInputChange}
+                                                sx={{
+                                                    color: 'rgba(255, 255, 255, 0.4)',
+                                                    '&.Mui-checked': {
+                                                        color: '#f0f0f0',
+                                                    },
+                                                }}
+                                            />
+                                        }
+                                        label={
+                                            <span style={{ color: '#f0f0f0', fontSize: '0.95rem' }}>
+                                                Remember me
+                                            </span>
+                                        }
                                     />
-                                </div>
-                            )}
 
-                            {/* Options */}
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                margin: isMobile ? '20px 0' : '25px 0',
-                                flexDirection: isMobile ? 'column' : 'row',
-                                gap: isMobile ? '15px' : '0'
-                            }}>
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            name="rememberMe"
-                                            checked={formData.rememberMe}
-                                            onChange={handleInputChange}
-                                            sx={{
-                                                color: 'rgba(255, 255, 255, 0.4)',
-                                                '&.Mui-checked': {
-                                                    color: '#f0f0f0',
-                                                },
-                                            }}
-                                        />
-                                    }
-                                    label={
-                                        <span style={{ color: '#f0f0f0', fontSize: '0.95rem' }}>
-                                            Remember me
-                                        </span>
-                                    }
-                                />
-
-                                {isLogin && (
                                     <Button
                                         type="button"
                                         onClick={handleForgotPassword}
@@ -786,8 +955,8 @@ const LoginSignup = () => {
                                     >
                                         Forgot password?
                                     </Button>
-                                )}
-                            </div>
+                                </div>
+                            )}
 
                             {/* Submit Button */}
                             <Button
