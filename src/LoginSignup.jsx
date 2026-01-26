@@ -189,7 +189,7 @@ const LoginSignup = () => {
                 const userRole = user.role;
 
                 if (userRole === 'customer') {
-                    toast.success("Welcome Admin! Redirecting...");
+                    toast.success("Welcome Customer! Redirecting...");
                     setTimeout(() => navigate("/customerDashboard"), 1500);
                 }
             }
