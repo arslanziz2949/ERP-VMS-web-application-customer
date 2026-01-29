@@ -1,469 +1,195 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import mqtt from "mqtt";
-import GasLineChart from "./GasLineChart";
-import DigitalGauge from "./DigitalGauge";
-import { useThemeValues } from '../Theme/Theme';
 
-const GAS_THRESHOLD = 333;
-const FIRE_THRESHOLD = 1;
-const GUN_THRESHOLD = 1;
+const BROKER_URL = "ws://192.168.18.28:9001";
+const TOPIC = "client/+/hub/+/sensor/+/+";
 
-const TOPICS = {
-  gas: "safety/gas",
-  fire: "safety/fire",
-  gun: "safety/gun",
-};
+const SafetyGraphs = ({ onSensorDataUpdate }) => {
+  const clientRef = useRef(null);
+  const [status, setStatus] = useState("Disconnected");
+  const [sensorData, setSensorData] = useState(null);
+  const [topicInfo, setTopicInfo] = useState("");
 
-const SafetyGraphs = () => {
-  const theme = useThemeValues();
-  const [gasHistory, setGasHistory] = useState([]);
-  const [fire, setFire] = useState(null);
-  const [gun, setGun] = useState(null);
-  const [mqttStatus, setMqttStatus] = useState("disconnected");
-  const [isMobile, setIsMobile] = useState(false);
+  const connectAndSubscribe = () => {
+    if (clientRef.current) return;
 
-  const [alerts, setAlerts] = useState({
-    gas: false,
-    fire: false,
-    gun: false,
-  });
+    console.log("🔌 Connecting to:", BROKER_URL);
+    console.log("📡 Subscribing to:", TOPIC);
 
-  // Check screen size
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  useEffect(() => {
-    const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
-
-    client.on("connect", () => {
-      setMqttStatus("connected");
-      client.subscribe(Object.values(TOPICS));
+    const client = mqtt.connect(BROKER_URL, {
+      clientId: "react_" + Math.random().toString(16).slice(2),
+      clean: true,
+      reconnectPeriod: 10000,
+      connectTimeout: 50000,
     });
 
-    client.on("message", (topic, message) => {
-      const value = Number(message.toString());
-      if (isNaN(value)) return;
+    clientRef.current = client;
 
-      if (topic === TOPICS.gas) {
-        setGasHistory((prev) => {
-          const updated = [...prev, value];
-          return updated.length > 20 ? updated.slice(-20) : updated;
-        });
-        setAlerts((p) => ({ ...p, gas: value > GAS_THRESHOLD }));
+    client.on("connect", (connack) => {
+      console.log("✅ MQTT CONNECTED", connack);
+      setStatus("Connected");
+
+      client.subscribe(TOPIC, (err, granted) => {
+        if (err) {
+          console.error("❌ SUBSCRIBE ERROR:", err);
+        } else {
+          console.log("✅ SUBSCRIBED:", granted);
+        }
+      });
+    });
+
+    client.on("message", (topic, payload) => {
+      console.log("Topic:", topic);
+      console.log("Payload:", payload.toString());
+
+      let data;
+      try {
+        data = JSON.parse(payload.toString());
+      } catch {
+        data = payload.toString();
       }
 
-      if (topic === TOPICS.fire) {
-        setFire(value);
-        setAlerts((p) => ({ ...p, fire: value >= FIRE_THRESHOLD }));
-      }
+      const topicParts = topic.split("/");
+      const hubId = topicParts[3];
+      const sensorType = topicParts[4];
+      const sensorId = topicParts[5];
 
-      if (topic === TOPICS.gun) {
-        setGun(value);
-        setAlerts((p) => ({ ...p, gun: value >= GUN_THRESHOLD }));
+      const sensorDataObj = {
+        value: data,
+        hub_id: hubId,
+        sensor_id: sensorId,
+        sensor_type: sensorType,
+        rawTopic: topic,
+        timestamp: new Date().toLocaleString(),
+      };
+
+      setSensorData(sensorDataObj);
+      setTopicInfo(topic);
+
+      // Pass data to parent component
+      if (onSensorDataUpdate) {
+        onSensorDataUpdate(sensorDataObj);
       }
     });
 
-    client.on("error", () => {
-      setMqttStatus("error");
+    client.on("reconnect", () => {
+      console.log("🔄 MQTT RECONNECTING...");
+      setStatus("Reconnecting");
     });
 
     client.on("offline", () => {
-      setMqttStatus("disconnected");
+      console.log("⚠️ MQTT OFFLINE");
+      setStatus("Offline");
     });
 
-    return () => client.end();
+    client.on("close", () => {
+      console.log("❌ MQTT CLOSED");
+      setStatus("Closed");
+      clientRef.current = null;
+    });
+
+    client.on("error", (err) => {
+      console.error("🚨 MQTT ERROR:", err);
+      setStatus("Error");
+    });
+  };
+
+  const disconnect = () => {
+    if (!clientRef.current) return;
+
+    console.log("🔌 Disconnecting MQTT");
+    clientRef.current.end(true);
+    clientRef.current = null;
+
+    setStatus("Disconnected");
+    setSensorData(null);
+    setTopicInfo("");
+  };
+
+  useEffect(() => {
+    // Auto-connect on component mount
+    connectAndSubscribe();
+
+    return () => {
+      disconnect();
+    };
   }, []);
 
   return (
-    <div style={{
-      width: "100%",
-      marginBottom: "32px",
-    }}>
-      {/* Header */}
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "24px",
-        flexWrap: "wrap",
-        gap: "16px",
-      }}>
-        <div>
-          <h2 style={{
-            fontSize: "24px",
-            fontWeight: "700",
-            color: theme.palette.text.primary,
-            margin: 0,
-          }}>
-            🚨 Safety Monitoring
-          </h2>
-          <p style={{
-            fontSize: "14px",
-            color: theme.palette.text.secondary,
-            marginTop: "8px",
-          }}>
-            Real-time sensor data from connected devices
-          </p>
-        </div>
-        
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-        }}>
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
+    <div style={{ padding: "20px", maxWidth: "700px" }}>
+      <h2>📡 Live Sensor Data Monitor</h2>
+
+      <p>
+        <strong>Status:</strong>{" "}
+        <span style={{ color: status === "Connected" ? "green" : "red" }}>
+          {status}
+        </span>
+      </p>
+
+      <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
+        <button 
+          onClick={connectAndSubscribe} 
+          disabled={status === "Connected"}
+          style={{
             padding: "8px 16px",
-            background: mqttStatus === "connected" 
-              ? "rgba(16, 185, 129, 0.1)" 
-              : "rgba(239, 68, 68, 0.1)",
-            borderRadius: "20px",
-            border: `1px solid ${mqttStatus === "connected" ? '#10b981' : '#ef4444'}`,
-          }}>
-            <div style={{
-              width: "8px",
-              height: "8px",
-              borderRadius: "50%",
-              background: mqttStatus === "connected" ? '#10b981' : '#ef4444',
-              animation: mqttStatus === "connected" ? 'pulse 2s infinite' : 'none',
-            }}></div>
-            <span style={{
-              fontSize: "14px",
-              fontWeight: "600",
-              color: mqttStatus === "connected" ? '#10b981' : '#ef4444',
-            }}>
-              {mqttStatus === "connected" ? "Connected" : "Disconnected"}
-            </span>
-          </div>
-        </div>
+            background: status === "Connected" ? "#4CAF50" : "#2196F3",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: status === "Connected" ? "not-allowed" : "pointer",
+          }}
+        >
+          🔌 Connect
+        </button>
+
+        <button 
+          onClick={disconnect} 
+          disabled={!clientRef.current}
+          style={{
+            padding: "8px 16px",
+            background: "#f44336",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: !clientRef.current ? "not-allowed" : "pointer",
+          }}
+        >
+          ❌ Disconnect
+        </button>
       </div>
 
-      {/* Grid Layout */}
       <div style={{
-        display: "grid",
-        gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr 1fr",
-        gap: "20px",
-        marginBottom: "20px",
+        padding: "16px",
+        border: "1px solid #ccc",
+        borderRadius: "8px",
+        background: "#f9f9f9",
+        marginBottom: "20px"
       }}>
-        {/* Gas Chart - Takes full width on mobile, 2/4 on desktop */}
-        <div style={{
-          gridColumn: isMobile ? "1 / -1" : "1 / 2",
-          gridRow: isMobile ? "1" : "1 / 3",
-        }}>
-          <GasLineChart 
-            data={gasHistory} 
-            threshold={GAS_THRESHOLD}
-            title="Gas Leakage Detection"
-          />
-        </div>
+        <h4>Latest Sensor Reading</h4>
 
-        {/* Fire Gauge */}
-        <div style={{
-          gridColumn: isMobile ? "1" : "2 / 3",
-          gridRow: isMobile ? "2" : "1",
-        }}>
-          <DigitalGauge
-            title="Fire Detection"
-            value={fire}
-            active={alerts.fire}
-            unit=""
-            icon="🔥"
-            size={isMobile ? "medium" : "small"}
-          />
-        </div>
-
-        {/* Gun Gauge */}
-        <div style={{
-          gridColumn: isMobile ? "1" : "3 / 4",
-          gridRow: isMobile ? "3" : "1",
-        }}>
-          <DigitalGauge
-            title="Weapon Detection"
-            value={gun}
-            active={alerts.gun}
-            unit=""
-            icon="🔫"
-            size={isMobile ? "medium" : "small"}
-          />
-        </div>
+        {sensorData ? (
+          <div>
+            <pre style={{ margin: 0, fontSize: "12px" }}>
+              {JSON.stringify(sensorData, null, 2)}
+            </pre>
+            <div style={{ marginTop: "10px", fontSize: "14px", color: "#555" }}>
+              <div><strong>Hub ID:</strong> {sensorData.hub_id}</div>
+              <div><strong>Sensor ID:</strong> {sensorData.sensor_id}</div>
+              <div><strong>Sensor Type:</strong> {sensorData.sensor_type}</div>
+              <div><strong>Value:</strong> {sensorData.value?.value || 'N/A'}</div>
+              <div><strong>Received:</strong> {sensorData.timestamp}</div>
+            </div>
+          </div>
+        ) : (
+          <p>Waiting for sensor data...</p>
+        )}
       </div>
 
-      {/* Alert Summary */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
-        gap: "16px",
-      }}>
-        <div style={{
-          padding: "16px",
-          background: alerts.gas 
-            ? "rgba(239, 68, 68, 0.05)" 
-            : theme.palette.bg.header,
-          borderRadius: "12px",
-          border: `1px solid ${alerts.gas ? '#ef4444' : theme.palette.border}`,
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-        }}>
-          <div style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "10px",
-            background: alerts.gas 
-              ? "linear-gradient(135deg, #ef4444, #dc2626)" 
-              : theme.palette.bg.cardGradient,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "20px",
-            color: alerts.gas ? "white" : theme.palette.text.onCard,
-          }}>
-            🟡
-          </div>
-          <div>
-            <div style={{
-              fontSize: "14px",
-              fontWeight: "600",
-              color: alerts.gas ? '#ef4444' : theme.palette.text.primary,
-            }}>
-              Gas Leakage
-            </div>
-            <div style={{
-              fontSize: "12px",
-              color: theme.palette.text.secondary,
-            }}>
-              {alerts.gas ? `Above ${GAS_THRESHOLD} ` : "Within safe limits"}
-            </div>
-          </div>
-        </div>
-
-        <div style={{
-          padding: "16px",
-          background: alerts.fire 
-            ? "rgba(239, 68, 68, 0.05)" 
-            : theme.palette.bg.header,
-          borderRadius: "12px",
-          border: `1px solid ${alerts.fire ? '#ef4444' : theme.palette.border}`,
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-        }}>
-          <div style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "10px",
-            background: alerts.fire 
-              ? "linear-gradient(135deg, #ef4444, #dc2626)" 
-              : theme.palette.bg.cardGradient,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "20px",
-            color: alerts.fire ? "white" : theme.palette.text.onCard,
-          }}>
-            🔥
-          </div>
-          <div>
-            <div style={{
-              fontSize: "14px",
-              fontWeight: "600",
-              color: alerts.fire ? '#ef4444' : theme.palette.text.primary,
-            }}>
-              Fire Detection
-            </div>
-            <div style={{
-              fontSize: "12px",
-              color: theme.palette.text.secondary,
-            }}>
-              {alerts.fire ? "Fire detected" : "No fire detected"}
-            </div>
-          </div>
-        </div>
-
-        <div style={{
-          padding: "16px",
-          background: alerts.gun 
-            ? "rgba(239, 68, 68, 0.05)" 
-            : theme.palette.bg.header,
-          borderRadius: "12px",
-          border: `1px solid ${alerts.gun ? '#ef4444' : theme.palette.border}`,
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-        }}>
-          <div style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "10px",
-            background: alerts.gun 
-              ? "linear-gradient(135deg, #ef4444, #dc2626)" 
-              : theme.palette.bg.cardGradient,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "20px",
-            color: alerts.gun ? "white" : theme.palette.text.onCard,
-          }}>
-            🔫
-          </div>
-          <div>
-            <div style={{
-              fontSize: "14px",
-              fontWeight: "600",
-              color: alerts.gun ? '#ef4444' : theme.palette.text.primary,
-            }}>
-              Weapon Detection
-            </div>
-            <div style={{
-              fontSize: "12px",
-              color: theme.palette.text.secondary,
-            }}>
-              {alerts.gun ? "Weapon detected" : "No weapons detected"}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
-        gap: "16px",
-        marginTop: "20px",
-      }}>
-        <div style={{
-          padding: "16px",
-          background: theme.palette.bg.header,
-          borderRadius: "12px",
-          border: `1px solid ${theme.palette.border}`,
-          textAlign: "center",
-        }}>
-          <div style={{
-            fontSize: "24px",
-            fontWeight: "700",
-            color: theme.palette.text.primary,
-          }}>
-            {gasHistory.length}
-          </div>
-          <div style={{
-            fontSize: "12px",
-            color: theme.palette.text.secondary,
-            marginTop: "4px",
-          }}>
-            Gas Readings
-          </div>
-        </div>
-
-        <div style={{
-          padding: "16px",
-          background: theme.palette.bg.header,
-          borderRadius: "12px",
-          border: `1px solid ${theme.palette.border}`,
-          textAlign: "center",
-        }}>
-          <div style={{
-            fontSize: "24px",
-            fontWeight: "700",
-            color: alerts.gas || alerts.fire || alerts.gun ? '#ef4444' : '#10b981',
-          }}>
-            {[alerts.gas, alerts.fire, alerts.gun].filter(Boolean).length}
-          </div>
-          <div style={{
-            fontSize: "12px",
-            color: theme.palette.text.secondary,
-            marginTop: "4px",
-          }}>
-            Active Alerts
-          </div>
-        </div>
-
-        <div style={{
-          padding: "16px",
-          background: theme.palette.bg.header,
-          borderRadius: "12px",
-          border: `1px solid ${theme.palette.border}`,
-          textAlign: "center",
-        }}>
-          <div style={{
-            fontSize: "24px",
-            fontWeight: "700",
-            color: theme.palette.text.primary,
-          }}>
-            {gasHistory.length > 0 ? Math.max(...gasHistory) : "--"}
-          </div>
-          <div style={{
-            fontSize: "12px",
-            color: theme.palette.text.secondary,
-            marginTop: "4px",
-          }}>
-            Max Gas Level
-          </div>
-        </div>
-
-        <div style={{
-          padding: "16px",
-          background: theme.palette.bg.header,
-          borderRadius: "12px",
-          border: `1px solid ${theme.palette.border}`,
-          textAlign: "center",
-        }}>
-          <div style={{
-            fontSize: "24px",
-            fontWeight: "700",
-            color: theme.palette.text.primary,
-          }}>
-            {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-          </div>
-          <div style={{
-            fontSize: "12px",
-            color: theme.palette.text.secondary,
-            marginTop: "4px",
-          }}>
-            Last Update
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.5; }
-          100% { opacity: 1; }
-        }
-        
-        @media (max-width: 1024px) {
-          .safety-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-        
-        @media (max-width: 768px) {
-          .safety-header {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-          }
-          
-          .stats-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-          }
-        }
-        
-        @media (max-width: 480px) {
-          .stats-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
+      {topicInfo && (
+        <p style={{ marginTop: "10px", fontSize: "14px", color: "#555" }}>
+          <strong>Active Topic:</strong> {topicInfo}
+        </p>
+      )}
     </div>
   );
 };

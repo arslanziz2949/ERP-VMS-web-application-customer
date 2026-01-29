@@ -1,41 +1,518 @@
 import React, { useState, useEffect } from 'react';
-import { useTheme } from '../Theme/ThemeContext';
 import { useThemeValues } from '../Theme/Theme';
 import SafetyGraphs from '../Components/SafetyGraphs';
+import urls from '../Urls/Urls';
 
-const CustomerDashboard = () => {
-  const { mode } = useTheme();
-  const theme = useThemeValues();
-  const [isMobile, setIsMobile] = useState(false);
-  const [registrationDate, setRegistrationDate] = useState('');
+const DeviceDetailsModal = ({ device, onClose, theme, onUpdateArmed, realTimeSensorData }) => {
+  if (!device) return null;
 
-  const containerStyle = {
-    padding: isMobile ? '16px' : '24px',
-    minHeight: '100vh',
-    background: theme.palette.bg.body,
-    maxWidth: '100%',
-    overflowX: 'hidden',
+  const modalStyle = {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    right: '0',
+    bottom: '0',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: '20px',
+  };
+
+  const contentStyle = {
+    background: theme.palette.bg.card,
+    borderRadius: '16px',
+    padding: '30px',
+    maxWidth: '700px',
+    width: '100%',
+    maxHeight: '80vh',
+    overflowY: 'auto',
+    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+    border: `1px solid ${theme.palette.border}`,
   };
 
   const headerStyle = {
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: '24px',
-    flexDirection: isMobile ? 'column' : 'row',
-    gap: isMobile ? '16px' : '0',
+    borderBottom: `1px solid ${theme.palette.border}`,
+    paddingBottom: '16px',
   };
 
   const titleStyle = {
-    fontSize: isMobile ? '20px' : '24px',
+    fontSize: '22px',
     fontWeight: '700',
     color: theme.palette.text.primary,
     margin: 0,
   };
 
+  const closeButtonStyle = {
+    background: 'none',
+    border: 'none',
+    fontSize: '24px',
+    cursor: 'pointer',
+    color: theme.palette.text.secondary,
+    padding: '8px',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+
+  const sectionTitleStyle = {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: theme.palette.text.primary,
+    marginBottom: '16px',
+    marginTop: '24px',
+  };
+
+  const gridStyle = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+    gap: '16px',
+    marginBottom: '20px',
+  };
+
+  const cardStyle = {
+    background: theme.palette.bg.body,
+    borderRadius: '8px',
+    padding: '16px',
+    border: `1px solid ${theme.palette.border}`,
+  };
+
+  const labelStyle = {
+    fontSize: '12px',
+    color: theme.palette.text.secondary,
+    textTransform: 'uppercase',
+    fontWeight: '600',
+    marginBottom: '4px',
+  };
+
+  const valueStyle = {
+    fontSize: '14px',
+    color: theme.palette.text.primary,
+    fontWeight: '500',
+  };
+
+  const arrayItemStyle = {
+    background: theme.palette.bg.card,
+    padding: '8px 12px',
+    borderRadius: '6px',
+    marginBottom: '4px',
+    border: `1px solid ${theme.palette.border}`,
+  };
+
+  // Filter real-time data for this specific device
+  const deviceRealtimeData = realTimeSensorData.filter(
+    data => data.hub_id === device.id.toString()
+  );
+
+  const handleToggleArmed = () => {
+    if (onUpdateArmed) {
+      onUpdateArmed(device.id, !device.armed);
+    }
+  };
+
+  return (
+    <div style={modalStyle} onClick={onClose}>
+      <div style={contentStyle} onClick={e => e.stopPropagation()}>
+        <div style={headerStyle}>
+          <div>
+            <h2 style={titleStyle}>Device Details: {device.name}</h2>
+            <div style={{ 
+              fontSize: '14px', 
+              color: theme.palette.text.secondary,
+              marginTop: '4px'
+            }}>
+              ID: {device.id} • {device.mac_adress}
+            </div>
+          </div>
+          <button style={closeButtonStyle} onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        {/* Real-time Sensor Data Section */}
+        {deviceRealtimeData.length > 0 && (
+          <div style={{
+            background: 'rgba(59, 130, 246, 0.1)',
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '24px',
+            border: `2px solid #3b82f6`,
+          }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: '700',
+              color: theme.palette.text.primary,
+              margin: 0,
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              📡 Live Sensor Data
+            </h3>
+            
+            <div style={gridStyle}>
+              {deviceRealtimeData.map((data, index) => (
+                <div key={index} style={{
+                  ...cardStyle,
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  border: '1px solid #3b82f6'
+                }}>
+                  <div style={labelStyle}>
+                    Sensor: {data.sensor_type} ({data.sensor_id})
+                  </div>
+                  <div style={valueStyle}>
+                    <div style={{ 
+                      fontSize: '24px', 
+                      fontWeight: '700',
+                      color: '#3b82f6',
+                      marginBottom: '4px'
+                    }}>
+                      {data.value?.value || 'N/A'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: theme.palette.text.secondary }}>
+                      Type: {data.value?.type || 'normal'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: theme.palette.text.secondary }}>
+                      Source: {data.value?.source || 'backend'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: theme.palette.text.muted, marginTop: '8px' }}>
+                      📅 {data.timestamp}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Armed Toggle Section */}
+        <div style={{
+          background: device.armed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+          borderRadius: '12px',
+          padding: '20px',
+          marginBottom: '24px',
+          border: `2px solid ${device.armed ? '#10b981' : '#ef4444'}`,
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px'
+          }}>
+            <div>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '700',
+                color: theme.palette.text.primary,
+                margin: 0,
+                marginBottom: '8px'
+              }}>
+                System {device.armed ? 'Armed' : 'Disarmed'}
+              </h3>
+              <p style={{
+                fontSize: '14px',
+                color: theme.palette.text.secondary,
+                margin: 0,
+              }}>
+                {device.armed 
+                  ? 'All security systems are active and monitoring' 
+                  : 'Security systems are temporarily disabled'}
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div 
+                style={{
+                  position: 'relative',
+                  display: 'inline-block',
+                  width: '60px',
+                  height: '30px',
+                  cursor: 'pointer'
+                }}
+                onClick={handleToggleArmed}
+              >
+                <span style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: '0',
+                  left: '0',
+                  right: '0',
+                  bottom: '0',
+                  backgroundColor: device.armed ? '#10b981' : '#dc2626',
+                  transition: '.4s',
+                  borderRadius: '34px',
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    content: '""',
+                    height: '22px',
+                    width: '22px',
+                    left: device.armed ? '34px' : '4px',
+                    bottom: '4px',
+                    backgroundColor: 'white',
+                    transition: '.4s',
+                    borderRadius: '50%',
+                  }} />
+                </span>
+              </div>
+              <button 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 20px',
+                  background: device.armed ? '#10b981' : '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                }}
+                onClick={handleToggleArmed}
+              >
+                {device.armed ? '🔒 Disarm' : '🔓 Arm'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Basic Device Info */}
+        <div style={gridStyle}>
+          <div style={cardStyle}>
+            <div style={labelStyle}>Device ID</div>
+            <div style={valueStyle}>{device.id}</div>
+          </div>
+          <div style={cardStyle}>
+            <div style={labelStyle}>MAC Address</div>
+            <div style={valueStyle}>{device.mac_adress}</div>
+          </div>
+          <div style={cardStyle}>
+            <div style={labelStyle}>Status</div>
+            <div style={valueStyle}>
+              <span style={{
+                color: device.is_claimed ? '#10b981' : '#ef4446',
+                fontWeight: '600',
+              }}>
+                {device.is_claimed ? 'Claimed' : 'Unclaimed'}
+              </span>
+            </div>
+          </div>
+          <div style={cardStyle}>
+            <div style={labelStyle}>Armed Status</div>
+            <div style={valueStyle}>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: device.armed ? '#10b981' : '#dc2626',
+              }}>
+                {device.armed ? '🔒 Armed' : '🔓 Disarmed'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Captive Data - Sensors */}
+        {device.captive_data?.sensors && (
+          <div>
+            <h4 style={sectionTitleStyle}>Configured Sensors</h4>
+            <div style={gridStyle}>
+              {Object.entries(device.captive_data.sensors).map(([sensorType, sensorData]) => (
+                <div key={sensorType} style={cardStyle}>
+                  <div style={labelStyle}>{sensorType.replace(/_/g, ' ')}</div>
+                  {Array.isArray(sensorData) ? (
+                    <div>
+                      {sensorData.map((sensor, index) => (
+                        <div key={index} style={arrayItemStyle}>
+                          <div style={valueStyle}>
+                            {sensor.id && <div>ID: {sensor.id}</div>}
+                            {sensor.name && <div>Name: {sensor.name}</div>}
+                            {!sensor.id && !sensor.name && JSON.stringify(sensor)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : sensorData && typeof sensorData === 'object' ? (
+                    <div style={valueStyle}>
+                      {sensorData.id && <div>ID: {sensorData.id}</div>}
+                      {sensorData.name && <div>Name: {sensorData.name}</div>}
+                    </div>
+                  ) : (
+                    <div style={valueStyle}>{String(sensorData)}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const CustomerDashboard = () => {
+  const theme = useThemeValues();
+  const [devices, setDevices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedDevice, setSelectedDevice] = useState(null);
+  const [updatingArmed, setUpdatingArmed] = useState(false);
+  const [realTimeSensorData, setRealTimeSensorData] = useState([]);
+  const [mqttConnected, setMqttConnected] = useState(false);
+  
+  // Get user data and token from localStorage
+  const userData = localStorage.getItem('user');
+  const user = JSON.parse(userData); 
+  const userId = user?.id;
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+
+  useEffect(() => {
+    if (userId && token) {
+      fetchDevices();
+    } else if (!token) {
+      setError('Authentication required. Please log in again.');
+      setLoading(false);
+    }
+  }, [userId, token]);
+
+  const fetchDevices = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`${urls.get_customer_devices}${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.status === 401) {
+        throw new Error('Authentication failed. Please log in again.');
+      }
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("full data",data);
+      
+      setDevices(data.devices || []);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch devices. Please try again later.');
+      console.error('Error fetching devices:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSensorDataUpdate = (sensorData) => {
+    console.log("Received sensor data:", sensorData);
+    
+    setRealTimeSensorData(prev => {
+      // Keep only last 50 readings to prevent memory issues
+      const newData = [sensorData, ...prev.slice(0, 49)];
+      return newData;
+    });
+  };
+
+  const handleUpdateArmed = async (deviceId, newArmedStatus) => {
+    try {
+      setUpdatingArmed(true);
+      
+      setDevices(prevDevices => 
+        prevDevices.map(device => 
+          device.id === deviceId 
+            ? { ...device, armed: newArmedStatus }
+            : device
+        )
+      );
+      
+      if (selectedDevice && selectedDevice.id === deviceId) {
+        setSelectedDevice(prev => ({
+          ...prev,
+          armed: newArmedStatus
+        }));
+      }
+      
+      console.log(`Updated device ${deviceId} armed status to: ${newArmedStatus}`);
+      alert(`Device ${newArmedStatus ? 'armed' : 'disarmed'} successfully!`);
+      
+    } catch (err) {
+      console.error('Error updating armed status:', err);
+      alert('Failed to update armed status. Please try again.');
+      fetchDevices();
+    } finally {
+      setUpdatingArmed(false);
+    }
+  };
+
+  const getTotalDevices = () => devices.length;
+  const getTotalSensors = () => {
+    return devices.reduce((total, device) => {
+      if (device.captive_data?.sensors) {
+        const sensors = device.captive_data.sensors;
+        let count = Object.keys(sensors).filter(key => key !== 'Door_window').length;
+        if (sensors.Door_window && Array.isArray(sensors.Door_window)) {
+          count += sensors.Door_window.length;
+        }
+        return total + count;
+      }
+      return total;
+    }, 0);
+  };
+  const getTotalCameras = () => {
+    return devices.reduce((total, device) => {
+      if (device.captive_data?.cams) {
+        return total + Object.keys(device.captive_data.cams).length;
+      }
+      return total;
+    }, 0);
+  };
+  const getClaimedDevices = () => devices.filter(device => device.is_claimed).length;
+  const getArmedDevices = () => devices.filter(device => device.armed).length;
+
+  // Get latest sensor readings count
+  const getLiveSensorReadings = () => {
+    const uniqueSensors = new Set();
+    realTimeSensorData.forEach(data => {
+      uniqueSensors.add(`${data.hub_id}-${data.sensor_id}`);
+    });
+    return uniqueSensors.size;
+  };
+
+  const containerStyle = {
+    padding: '24px',
+    minHeight: '100vh',
+    background: theme.palette.bg.body,
+  };
+
+  const headerStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '24px',
+  };
+
+  const titleStyle = {
+    fontSize: '24px',
+    fontWeight: '700',
+    color: theme.palette.text.primary,
+  };
+
   const cardGridStyle = {
     display: 'grid',
-    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
     gap: '16px',
     marginBottom: '32px',
   };
@@ -43,47 +520,28 @@ const CustomerDashboard = () => {
   const sectionStyle = {
     background: theme.palette.bg.card,
     borderRadius: '12px',
-    padding: isMobile ? '16px' : '24px',
+    padding: '24px',
     marginBottom: '24px',
     boxShadow: theme.palette.shadow,
     border: `1px solid ${theme.palette.border}`,
-    transition: 'all 0.3s ease',
-    overflow: 'hidden',
-  };
-
-  const sectionTitleStyle = {
-    fontSize: isMobile ? '16px' : '18px',
-    fontWeight: '600',
-    color: theme.palette.text.primary,
-    marginBottom: isMobile ? '16px' : '20px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-  };
-
-  const tableContainerStyle = {
-    overflowX: 'auto',
-    WebkitOverflowScrolling: 'touch',
   };
 
   const tableStyle = {
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: isMobile ? '600px' : 'auto',
   };
 
   const thStyle = {
-    padding: isMobile ? '8px 12px' : '12px',
+    padding: '12px',
     textAlign: 'left',
     borderBottom: `2px solid ${theme.palette.border}`,
     color: theme.palette.text.secondary,
     fontWeight: '600',
     fontSize: '14px',
-    whiteSpace: 'nowrap',
   };
 
   const tdStyle = {
-    padding: isMobile ? '8px 12px' : '12px',
+    padding: '12px',
     borderBottom: `1px solid ${theme.palette.border}`,
     color: theme.palette.text.primary,
     fontSize: '14px',
@@ -94,174 +552,261 @@ const CustomerDashboard = () => {
     borderRadius: '20px',
     fontSize: '12px',
     fontWeight: '600',
-    background: status === 'Active'
-      ? 'rgba(16, 185, 129, 0.1)'
-      : status === 'Pending'
-        ? 'rgba(245, 158, 11, 0.1)'
-        : 'rgba(239, 68, 68, 0.1)',
-    color: status === 'Active'
-      ? '#10b981'
-      : status === 'Pending'
-        ? '#f59e0b'
-        : '#ef4444',
+    background: status ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+    color: status ? '#10b981' : '#ef4444',
     display: 'inline-block',
   });
 
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    
-    const getRegistrationDate = () => {
-      const registeredDate = localStorage.getItem('user_registration_date') || '2024-01-15';
-      setRegistrationDate(registeredDate);
-    };
-    
-    checkMobile();
-    getRegistrationDate();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const deviceRowStyle = {
+    cursor: 'pointer',
+    transition: 'background-color 0.2s ease',
+  };
 
-  const formatRegistrationDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+  const statCards = [
+    { 
+      text: 'Total Devices', 
+      heading: getTotalDevices().toString(), 
+      image: '📡',
+      description: 'Connected hubs'
+    },
+    { 
+      text: 'Live Sensors', 
+      heading: getLiveSensorReadings().toString(), 
+      image: '📊',
+      description: 'Active readings',
+      color: '#3b82f6'
+    },
+    { 
+      text: 'Total Sensors', 
+      heading: getTotalSensors().toString(), 
+      image: '🔄',
+      description: 'Configured sensors'
+    },
+    { 
+      text: 'Armed Devices', 
+      heading: getArmedDevices().toString(), 
+      image: '🔒',
+      description: 'Active security'
+    },
+    { 
+      text: 'Security Cameras', 
+      heading: getTotalCameras().toString(), 
+      image: '📹',
+      description: 'Connected cameras'
+    },
+  ];
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric'
     });
   };
 
-  const getDaysSinceRegistration = () => {
-    if (!registrationDate) return 0;
-    const regDate = new Date(registrationDate);
-    const today = new Date();
-    const diffTime = Math.abs(today - regDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
   };
 
-  const statCards = [
-    {
-      text: 'Active Devices',
-      heading: '24',
-      image: '📡',
-      change: '+12%',
-      changeType: 'increase',
-      shortDescription: `Registered on ${formatRegistrationDate(registrationDate)}`
-    },
-    {
-      text: 'Security Cameras',
-      heading: '48',
-      image: '📹',
-      change: '+8%',
-      changeType: 'increase',
-      shortDescription: `${getDaysSinceRegistration()} days of surveillance`
-    },
-    {
-      text: 'Power Usage',
-      heading: '2.4 kW',
-      image: '⚡',
-      change: '-5%',
-      changeType: 'decrease',
-      shortDescription: 'Optimized via mobile controls'
-    },
-    {
-      text: isMobile ? 'Mobile App' : 'System Status',
-      heading: isMobile ? 'Active' : 'Connected',
-      image: '📱',
-      change: isMobile ? '✓ Online' : '↗ 15%',
-      changeType: isMobile ? 'online' : 'increase',
-      shortDescription: isMobile ? 'Using mobile app' : 'All systems operational'
+  const handleDeviceClick = (device) => {
+    console.log("Clicked device details:", device);
+    setSelectedDevice(device);
+  };
+
+  // Get real-time data for specific device
+  const getDeviceLiveData = (deviceId) => {
+    return realTimeSensorData.filter(data => data.hub_id === deviceId.toString());
+  };
+
+  // Get latest sensor value for display in table
+  const getLatestSensorValue = (deviceId) => {
+    const deviceData = getDeviceLiveData(deviceId);
+    if (deviceData.length > 0) {
+      const latest = deviceData[0];
+      return latest.value?.value || 'No data';
     }
-  ];
+    return 'No data';
+  };
+
+  if (!token) {
+    return (
+      <div style={containerStyle}>
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '40px',
+          color: '#ef4444' 
+        }}>
+          Authentication required. Please log in to access the dashboard.
+          <button 
+            onClick={() => window.location.href = '/login'}
+            style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              background: theme.palette.primary,
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={containerStyle}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '100vh',
+          flexDirection: 'column',
+          gap: '20px'
+        }}>
+          <div style={{ fontSize: '16px', color: theme.palette.text.secondary }}>
+            Loading devices...
+          </div>
+          <div style={{ fontSize: '12px', color: theme.palette.text.muted }}>
+            User ID: {userId}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={containerStyle}>
+        <div style={{ 
+          color: '#ef4444', 
+          textAlign: 'center', 
+          padding: '40px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '20px'
+        }}>
+          <div>{error}</div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+              onClick={fetchDevices}
+              style={{
+                padding: '10px 20px',
+                background: theme.palette.primary,
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+            <button 
+              onClick={handleLogout}
+              style={{
+                padding: '10px 20px',
+                background: theme.palette.bg.body,
+                color: theme.palette.text.primary,
+                border: `1px solid ${theme.palette.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={containerStyle}>
+      {selectedDevice && (
+        <DeviceDetailsModal
+          device={selectedDevice}
+          onClose={() => setSelectedDevice(null)}
+          theme={theme}
+          onUpdateArmed={handleUpdateArmed}
+          realTimeSensorData={getDeviceLiveData(selectedDevice.id)}
+        />
+      )}
+      
       <div style={headerStyle}>
         <div>
-          <h1 style={titleStyle}>
-            Safety Monitoring Dashboard
-            {isMobile && <span style={{ fontSize: '14px', color: theme.palette.text.secondary, marginLeft: '10px' }}>📱 Mobile</span>}
-          </h1>
-          <p style={{
-            fontSize: '14px',
-            color: theme.palette.text.secondary,
-            marginTop: '8px'
-          }}>
-            {isMobile
-              ? `Real-time monitoring since ${formatRegistrationDate(registrationDate)}`
-              : `Registered on ${formatRegistrationDate(registrationDate)} • ${getDaysSinceRegistration()} days of service`
-            }
-          </p>
-        </div>
-        <div style={{ 
-          display: 'flex', 
-          gap: '12px',
-          width: isMobile ? '100%' : 'auto',
-        }}>
-          <button style={{
-            padding: isMobile ? '8px 16px' : '10px 20px',
-            background: theme.palette.bg.cardGradient,
-            color: theme.palette.text.onCard,
-            border: 'none',
-            borderRadius: '8px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
+          <h1 style={titleStyle}>Safety Monitoring Dashboard</h1>
+          <div style={{ 
+            fontSize: '14px', 
+            color: theme.palette.text.secondary, 
+            marginTop: '4px',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            flex: isMobile ? 1 : 'auto',
-            justifyContent: 'center',
+            gap: '20px'
           }}>
-            <span>⚙️</span> {isMobile ? 'Settings' : 'Dashboard Settings'}
-          </button>
-          {!isMobile && (
-            <button style={{
+            <span>User ID: {userId}</span>
+            <span>•</span>
+            <span>{devices.length} device(s) found</span>
+            <span>•</span>
+            <span>Live sensors: {getLiveSensorReadings()}</span>
+            <span>•</span>
+            <span>Armed: {getArmedDevices()}</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={fetchDevices}
+            disabled={updatingArmed}
+            style={{
               padding: '10px 20px',
-              background: theme.palette.bg.body,
-              border: `1px solid ${theme.palette.border}`,
-              color: theme.palette.text.primary,
+              background: theme.palette.bg.cardGradient,
+              color: theme.palette.text.onCard,
+              border: 'none',
               borderRadius: '8px',
               fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
+              cursor: updatingArmed ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-            }}>
-              <span>📊</span> Export Report
-            </button>
-          )}
+              opacity: updatingArmed ? 0.6 : 1,
+            }}
+          >
+            {updatingArmed ? '⏳ Updating...' : '🔄 Refresh'}
+          </button>
+          <button 
+            onClick={handleLogout}
+            style={{
+              padding: '10px 20px',
+              background: theme.palette.bg.body,
+              color: theme.palette.text.primary,
+              border: `1px solid ${theme.palette.border}`,
+              borderRadius: '8px',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            Logout
+          </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div style={cardGridStyle}>
         {statCards.map((card, index) => (
           <div key={index} style={{
             background: theme.palette.bg.card,
             borderRadius: '12px',
-            padding: isMobile ? '16px' : '20px',
+            padding: '20px',
             boxShadow: theme.palette.shadow,
             border: `1px solid ${theme.palette.border}`,
-            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-          }}
-            onMouseOver={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = theme.palette.shadowLg;
-              }
-            }}
-            onMouseOut={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = theme.palette.shadow;
-              }
-            }}
-          >
+            borderTop: card.color ? `4px solid ${card.color}` : undefined,
+          }}>
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
@@ -269,337 +814,181 @@ const CustomerDashboard = () => {
               marginBottom: '12px'
             }}>
               <div>
-                <div style={{
-                  fontSize: isMobile ? '14px' : '16px',
-                  fontWeight: '600',
-                  color: theme.palette.text.secondary,
-                  marginBottom: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}>
-                  <span>{card.image}</span> {card.text}
+                <div style={{ fontSize: '16px', fontWeight: '600', color: theme.palette.text.secondary }}>
+                  {card.text}
                 </div>
-                <div style={{
-                  fontSize: isMobile ? '28px' : '32px',
-                  fontWeight: '700',
-                  color: theme.palette.text.primary,
-                  margin: '8px 0',
+                <div style={{ 
+                  fontSize: '32px', 
+                  fontWeight: '700', 
+                  color: card.color || theme.palette.text.primary 
                 }}>
                   {card.heading}
                 </div>
               </div>
-              <div style={{
-                width: isMobile ? '40px' : '48px',
-                height: isMobile ? '40px' : '48px',
-                borderRadius: '12px',
-                background: theme.palette.bg.cardGradient,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: isMobile ? '20px' : '24px',
-              }}>
+              <div style={{ fontSize: '32px' }}>
                 {card.image}
               </div>
             </div>
-
             <div style={{
               fontSize: '13px',
               color: theme.palette.text.secondary,
-              marginTop: '12px',
-              padding: '8px',
-              background: theme.palette.bg.header,
-              borderRadius: '6px',
-              borderLeft: `3px solid ${theme.palette.primary}`,
+              marginTop: '8px',
             }}>
-              {card.shortDescription}
-            </div>
-
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '12px',
-              color: theme.palette.text.secondary,
-              marginTop: '12px'
-            }}>
-              <span style={{
-                color: card.changeType === 'increase' || card.changeType === 'online'
-                  ? '#10b981'
-                  : '#ef4444',
-                fontWeight: '600'
-              }}>
-                {card.change}
-              </span>
-              <span>from last month</span>
+              {card.description}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Safety Graphs Component */}
       <div style={sectionStyle}>
-        <SafetyGraphs />
+        <SafetyGraphs onSensorDataUpdate={handleSensorDataUpdate} />
       </div>
 
-      {/* Recent Activity */}
       <div style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>
-          <span>📋</span> Recent Activity
-        </h2>
-        <div style={tableContainerStyle}>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>Device</th>
-                <th style={thStyle}>Type</th>
-                <th style={thStyle}>Status</th>
-                <th style={thStyle}>Last Update</th>
-                {!isMobile && <th style={thStyle}>Power</th>}
-                <th style={thStyle}>Connection</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { device: 'SCS-001', type: 'Main Controller', status: 'Active', lastUpdate: '2 mins ago', power: '120W', connection: isMobile ? '📱 Mobile' : '💻 Desktop' },
-                { device: 'CAM-012', type: 'Security Camera', status: 'Active', lastUpdate: '5 mins ago', power: '45W', connection: isMobile ? '📱 Mobile' : '💻 Desktop' },
-                { device: 'SCS-003', type: 'Gateway', status: 'Inactive', lastUpdate: '1 hour ago', power: '0W', connection: '📡 Offline' },
-                { device: 'CAM-045', type: 'PTZ Camera', status: 'Pending', lastUpdate: '2 hours ago', power: '45W', connection: isMobile ? '📱 Mobile' : '💻 Desktop' },
-                { device: 'SCS-008', type: 'Sub-controller', status: 'Active', lastUpdate: '3 hours ago', power: '120W', connection: isMobile ? '📱 Mobile' : '💻 Desktop' },
-              ].map((row, index) => (
-                <tr key={index}>
-                  <td style={tdStyle}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{
-                        width: isMobile ? '28px' : '32px',
-                        height: isMobile ? '28px' : '32px',
-                        borderRadius: '6px',
-                        background: theme.palette.primaryLight,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: theme.palette.primary,
-                        fontSize: isMobile ? '14px' : '16px',
-                      }}>
-                        {row.type.includes('Camera') ? '📹' : '📡'}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: '600', fontSize: isMobile ? '14px' : '16px' }}>{row.device}</div>
-                        <div style={{ fontSize: '12px', color: theme.palette.text.muted }}>Added via mobile app</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={tdStyle}>{row.type}</td>
-                  <td style={tdStyle}>
-                    <span style={statusBadgeStyle(row.status)}>{row.status}</span>
-                  </td>
-                  <td style={tdStyle}>{row.lastUpdate}</td>
-                  {!isMobile && <td style={tdStyle}>{row.power}</td>}
-                  <td style={tdStyle}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      color: theme.palette.text.secondary
-                    }}>
-                      {row.connection}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>
-          <span>⚡</span> Quick Actions
-        </h2>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '12px' 
-        }}>
-          <button
-            style={{
-              padding: isMobile ? '12px 16px' : '12px 24px',
-              background: theme.palette.bg.body,
-              border: `2px solid ${theme.palette.primary}`,
-              color: theme.palette.primary,
-              borderRadius: '8px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              justifyContent: 'center',
-              fontSize: isMobile ? '14px' : '16px',
-            }}
-            onMouseOver={(e) => {
-              e.target.style.background = theme.palette.primaryLight;
-            }}
-            onMouseOut={(e) => {
-              e.target.style.background = theme.palette.bg.body;
-            }}
-          >
-            <span>📱</span> {isMobile ? 'Mobile App' : 'Open Mobile App'}
-          </button>
-          <button style={{
-            padding: isMobile ? '12px 16px' : '12px 24px',
-            background: theme.palette.bg.body,
-            border: `2px solid ${theme.palette.primary}`,
-            color: theme.palette.primary,
-            borderRadius: '8px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            justifyContent: 'center',
-            fontSize: isMobile ? '14px' : '16px',
-          }}
-            onMouseOver={(e) => {
-              e.target.style.background = theme.palette.primaryLight;
-            }}
-            onMouseOut={(e) => {
-              e.target.style.background = theme.palette.bg.body;
-            }}
-          >
-            <span>🔄</span> {isMobile ? 'Sync Data' : 'Sync Mobile Data'}
-          </button>
-          <button style={{
-            padding: isMobile ? '12px 16px' : '12px 24px',
-            background: theme.palette.bg.body,
-            border: `2px solid #10b981`,
-            color: '#10b981',
-            borderRadius: '8px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            justifyContent: 'center',
-            fontSize: isMobile ? '14px' : '16px',
-          }}
-            onMouseOver={(e) => {
-              e.target.style.background = 'rgba(16, 185, 129, 0.1)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.background = theme.palette.bg.body;
-            }}
-          >
-            <span>📊</span> {isMobile ? 'Analytics' : 'View Analytics'}
-          </button>
-          <button style={{
-            padding: isMobile ? '12px 16px' : '12px 24px',
-            background: theme.palette.bg.body,
-            border: `2px solid ${theme.palette.primary}`,
-            color: theme.palette.primary,
-            borderRadius: '8px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            justifyContent: 'center',
-            fontSize: isMobile ? '14px' : '16px',
-          }}
-            onMouseOver={(e) => {
-              e.target.style.background = theme.palette.primaryLight;
-            }}
-            onMouseOut={(e) => {
-              e.target.style.background = theme.palette.bg.body;
-            }}
-          >
-            <span>📧</span> {isMobile ? 'Support' : 'Contact Support'}
-          </button>
-        </div>
-      </div>
-
-      {/* Registration Summary */}
-      <div style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>
-          <span>📅</span> Registration Summary
-        </h2>
         <div style={{
           display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          gap: isMobile ? '16px' : '24px',
-          background: theme.palette.bg.header,
-          borderRadius: '12px',
-          padding: isMobile ? '16px' : '20px',
-          border: `1px solid ${theme.palette.border}`,
-          flexDirection: isMobile ? 'column' : 'row',
+          marginBottom: '20px'
         }}>
+          <h2 style={{ fontSize: '18px', fontWeight: '600', color: theme.palette.text.primary }}>
+            Your Devices
+          </h2>
           <div style={{
-            width: isMobile ? '60px' : '80px',
-            height: isMobile ? '60px' : '80px',
-            borderRadius: '50%',
-            background: theme.palette.bg.cardGradient,
+            fontSize: '14px',
+            color: theme.palette.text.secondary,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: isMobile ? '24px' : '32px',
-            color: theme.palette.text.onCard,
-            flexShrink: 0,
+            gap: '10px'
           }}>
-            📅
-          </div>
-          <div style={{ flex: 1, textAlign: isMobile ? 'center' : 'left' }}>
-            <div style={{ 
-              fontSize: isMobile ? '16px' : '18px', 
-              fontWeight: '600', 
-              color: theme.palette.text.primary, 
-              marginBottom: '8px' 
-            }}>
-              {isMobile ? 'Mobile App User' : 'Registered User'}
-            </div>
-            <div style={{ fontSize: '14px', color: theme.palette.text.secondary, marginBottom: '4px' }}>
-              First registered on {formatRegistrationDate(registrationDate)}
-            </div>
-            <div style={{ fontSize: '14px', color: theme.palette.text.secondary }}>
-              {getDaysSinceRegistration()} days of active service • {isMobile ? 'Primary access via mobile' : 'Access via web & mobile'}
-            </div>
-          </div>
-          <div style={{
-            padding: isMobile ? '8px 16px' : '12px 20px',
-            background: theme.palette.bg.cardGradient,
-            color: theme.palette.text.onCard,
-            borderRadius: '8px',
-            fontWeight: '600',
-            fontSize: isMobile ? '14px' : '16px',
-            flexShrink: 0,
-          }}>
-            {getDaysSinceRegistration()} Days
+            {realTimeSensorData.length > 0 && (
+              <span style={{
+                padding: '4px 8px',
+                background: 'rgba(59, 130, 246, 0.1)',
+                borderRadius: '4px',
+                color: '#3b82f6',
+                fontSize: '12px',
+                fontWeight: '600'
+              }}>
+                📡 Live data active
+              </span>
+            )}
+            <span>Click any device to view details</span>
           </div>
         </div>
+        {devices.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: theme.palette.text.secondary }}>
+            No devices found. Please add a device to get started.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Device Name</th>
+                  <th style={thStyle}>MAC Address</th>
+                  <th style={thStyle}>Status</th>
+                  <th style={thStyle}>Armed</th>
+                  <th style={thStyle}>Live Data</th>
+                  <th style={thStyle}>Created</th>
+                  <th style={thStyle}>Sensors</th>
+                  <th style={thStyle}>Cameras</th>
+                </tr>
+              </thead>
+              <tbody>
+                {devices.map((device) => {
+                  const deviceLiveData = getDeviceLiveData(device.id);
+                  const hasLiveData = deviceLiveData.length > 0;
+                  
+                  return (
+                    <tr 
+                      key={device.id}
+                      style={deviceRowStyle}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = `${theme.palette.primary}10`}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      onClick={() => handleDeviceClick(device)}
+                    >
+                      <td style={tdStyle}>
+                        <div style={{ fontWeight: '600', color: theme.palette.primary, cursor: 'pointer' }}>
+                          {device.name}
+                          {hasLiveData && (
+                            <span style={{
+                              marginLeft: '8px',
+                              fontSize: '10px',
+                              background: '#3b82f6',
+                              color: 'white',
+                              padding: '2px 6px',
+                              borderRadius: '10px'
+                            }}>
+                              LIVE
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '12px', color: theme.palette.text.muted }}>
+                          ID: {device.id}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>{device.mac_adress}</td>
+                      <td style={tdStyle}>
+                        <span style={statusBadgeStyle(device.is_claimed)}>
+                          {device.is_claimed ? 'Claimed' : 'Unclaimed'}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          ...statusBadgeStyle(device.armed),
+                          background: device.armed ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                        }}>
+                          {device.armed ? '🔒 Armed' : '🔓 Disarmed'}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        {hasLiveData ? (
+                          <div>
+                            <div style={{ 
+                              fontWeight: '600', 
+                              color: '#3b82f6',
+                              fontSize: '14px'
+                            }}>
+                              {deviceLiveData[0].value?.value || 'N/A'}
+                            </div>
+                            <div style={{ fontSize: '11px', color: theme.palette.text.muted }}>
+                              {deviceLiveData.length} reading(s)
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ 
+                            fontSize: '12px', 
+                            color: theme.palette.text.secondary,
+                            fontStyle: 'italic'
+                          }}>
+                            No live data
+                          </div>
+                        )}
+                      </td>
+                      <td style={tdStyle}>{formatDate(device.created_at)}</td>
+                      <td style={tdStyle}>
+                        {device.captive_data?.sensors ? 
+                          Object.keys(device.captive_data.sensors)
+                            .filter(key => key !== 'Door_window').length + 
+                            (device.captive_data.sensors.Door_window?.length || 0)
+                          : '0'
+                        }
+                      </td>
+                      <td style={tdStyle}>
+                        {device.captive_data?.cams ? 
+                          Object.keys(device.captive_data.cams).length : '0'
+                        }
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-
-      <style>{`
-        @media (max-width: 480px) {
-          .quick-actions {
-            grid-template-columns: 1fr !important;
-          }
-        }
-        
-        @media (max-width: 360px) {
-          .container {
-            padding: 12px !important;
-          }
-          
-          .section {
-            padding: 12px !important;
-          }
-        }
-      `}</style>
     </div>
   );
 };
-
 export default CustomerDashboard;

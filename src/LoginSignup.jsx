@@ -177,7 +177,7 @@ const LoginSignup = () => {
 
             console.log("✅ LOGIN SUCCESS");
             const { access, refresh, user } = response.data;
-
+            console.log("login response",response.data);      
             if (access) {
                 localStorage.setItem("access_token", access);
             }
